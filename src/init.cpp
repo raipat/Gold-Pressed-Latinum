@@ -223,6 +223,7 @@ std::string HelpMessage()
         "  -pid=<file>            " + _("Specify pid file (default: goldpressedlatinumd.pid)") + "\n" +
         "  -gen                   " + _("Generate coins") + "\n" +
         "  -gen=0                 " + _("Don't generate coins") + "\n" +
+        "  -staking=<n>           " + _("Generate coin stakes (default: 0 = disabled)") + "\n" +
         "  -datadir=<dir>         " + _("Specify data directory") + "\n" +
         "  -dbcache=<n>           " + _("Set database cache size in megabytes (default: 25)") + "\n" +
         "  -dblogsize=<n>         " + _("Set database disk log size in megabytes (default: 100)") + "\n" +
@@ -279,10 +280,10 @@ std::string HelpMessage()
         "  -upgradewallet         " + _("Upgrade wallet to latest format") + "\n" +
         "  -keypool=<n>           " + _("Set key pool size to <n> (default: 100)") + "\n" +
         "  -rescan                " + _("Rescan the block chain for missing wallet transactions") + "\n" +
-        "  -splitthreshold=<n>    " + _("Set stake split threshold within range (default 5),(max 200))") + "\n" +
-        "  -combinethreshold=<n>  " + _("Set stake combine threshold within range (default 1),(max 100))") + "\n" +
+        "  -splitthreshold=<n>    " + _("Set stake split threshold within range (default 20),(max 200))") + "\n" +
+        "  -combinethreshold=<n>  " + _("Set stake combine threshold within range (default 2),(max 100))") + "\n" +
         "  -salvagewallet         " + _("Attempt to recover private keys from a corrupt wallet.dat") + "\n" +
-        "  -checkblocks=<n>       " + _("How many blocks to check at startup (default: 2500, 0 = all)") + "\n" +
+        "  -checkblocks=<n>       " + _("How many blocks to check at startup (default: 600, 0 = all)") + "\n" +
         "  -checklevel=<n>        " + _("How thorough the block verification is (0-6, default: 1)") + "\n" +
         "  -loadblock=<file>      " + _("Imports blocks from external blk000?.dat file") + "\n" +
 
@@ -436,6 +437,9 @@ bool AppInit2()
         if (nTransactionFee > 0.25 * COIN)
             InitWarning(_("Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction."));
     }
+    
+    // Controls proof-of-stake generation 
+     fStaking = GetBoolArg("-staking", false);
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 

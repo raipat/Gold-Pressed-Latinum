@@ -72,8 +72,8 @@ int64 nHPSTimerStart;
 
 // Settings
 int64 nTransactionFee = MIN_TX_FEE;
-int64 nSplitThreshold = 5 * COIN;
-int64 nCombineThreshold = 1 * COIN;
+int64 nSplitThreshold = 20 * COIN;
+int64 nCombineThreshold = 2 * COIN;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -4322,30 +4322,32 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
 
     // Make this thread recognisable as the mining thread
-    RenameThread("bitcoin-miner");
+    RenameThread("goldpressed-minter");
 
     // Each thread has its own key and counter
     CReserveKey reservekey(pwallet);
     unsigned int nExtraNonce = 0;
 
-    while (fGenerateBitcoins || fProofOfStake)
+    while (fGenerateBitcoins || fProofOfStake )
     {
         if (fShutdown)
             return;
-        while (vNodes.empty() || IsInitialBlockDownload())
+        while (vNodes.empty() || IsInitialBlockDownload() || !fStaking || vNodes.size() < 2 || nBestHeight < GetNumBlocksOfPeers())
         {
             //printf("vNodes.size() == %d, IsInitialBlockDownload() == %d\n", vNodes.size(), IsInitialBlockDownload());
-            Sleep(1000);
+            Sleep(2000);
             if (fShutdown)
                 return;
             if ((!fGenerateBitcoins) && !fProofOfStake)
                 return;
         }
 
-        while (pwallet->IsLocked())
+        while (pwallet->IsLocked() || !pwallet->MintableCoins())
         {
-            strMintWarning = strMintMessage;
-            Sleep(1000);
+            //strMintWarning = strMintMessage;
+            Sleep(10000);
+            if (fShutdown)
+                return;
         }
         strMintWarning = "";
 

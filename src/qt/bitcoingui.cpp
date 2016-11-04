@@ -26,6 +26,7 @@
 #include "guiutil.h"
 #include "rpcconsole.h"
 #include "blockbrowser.h"
+#include "wallet.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"
@@ -57,6 +58,7 @@
 #include <QStyle>
 
 #include <iostream>
+extern CWallet* pwalletMain;
 
 BitcoinGUI::BitcoinGUI(QWidget *parent):
     QMainWindow(parent),
@@ -126,21 +128,25 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     // Status bar notification icons
     QFrame *frameBlocks = new QFrame();
     frameBlocks->setContentsMargins(0,0,0,0);
-    frameBlocks->setMinimumWidth(56);
-    frameBlocks->setMaximumWidth(56);
+    frameBlocks->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     QHBoxLayout *frameBlocksLayout = new QHBoxLayout(frameBlocks);
     frameBlocksLayout->setContentsMargins(3,0,3,0);
     frameBlocksLayout->setSpacing(3);
     labelEncryptionIcon = new QLabel();
+    labelStakingIcon = new QLabel();
     labelConnectionsIcon = new QLabel();
     labelBlocksIcon = new QLabel();
     frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelEncryptionIcon);
     frameBlocksLayout->addStretch();
+    frameBlocksLayout->addWidget(labelStakingIcon);
+    frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelConnectionsIcon);
     frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelBlocksIcon);
     frameBlocksLayout->addStretch();
+    
+    updateStakingIcon();
 
     // Progress bar and label for blocks download
     progressBarLabel = new QLabel();
@@ -262,7 +268,9 @@ void BitcoinGUI::createActions()
     changePassphraseAction->setToolTip(tr("Change the passphrase used for wallet encryption"));
     signMessageAction = new QAction(QIcon(":/icons/edit"), tr("Sign &message..."), this);
     verifyMessageAction = new QAction(QIcon(":/icons/transaction_0"), tr("&Verify message..."), this);
-    
+    stakeMinerToggleAction = new QAction(this);
+    stakeMinerToggle(true);
+
     blockAction = new QAction(QIcon(":/icons/blexp"), tr("Block Bro&wser"), this);
     blockAction->setStatusTip(tr("Explore the BlockChain"));
     blockAction->setToolTip(blockAction->statusTip());
@@ -282,6 +290,7 @@ void BitcoinGUI::createActions()
     connect(changePassphraseAction, SIGNAL(triggered()), this, SLOT(changePassphrase()));
     connect(signMessageAction, SIGNAL(triggered()), this, SLOT(gotoSignMessageTab()));
     connect(verifyMessageAction, SIGNAL(triggered()), this, SLOT(gotoVerifyMessageTab()));
+    connect(stakeMinerToggleAction, SIGNAL(triggered()), this, SLOT(stakeMinerToggle()));
     connect(blockAction, SIGNAL(triggered()), this, SLOT(gotoBlockBrowser()));
 }
 
@@ -309,6 +318,7 @@ void BitcoinGUI::createMenuBar()
     settings->addAction(changePassphraseAction);
     settings->addSeparator();
     settings->addAction(optionsAction);
+    settings->addAction(stakeMinerToggleAction);
     
     QMenu *network = appMenuBar->addMenu(tr("&Network"));
     network->addAction(blockAction);
@@ -367,6 +377,7 @@ void BitcoinGUI::setClientModel(ClientModel *clientModel)
 
         setNumBlocks(clientModel->getNumBlocks(), clientModel->getNumBlocksOfPeers());
         connect(clientModel, SIGNAL(numBlocksChanged(int,int)), this, SLOT(setNumBlocks(int,int)));
+        connect(clientModel, SIGNAL(numBlocksChanged(int,int)), this, SLOT(updateStakingIcon()));
 
         // Report errors from network/worker thread
         connect(clientModel, SIGNAL(error(QString,QString,bool)), this, SLOT(error(QString,QString,bool)));
@@ -870,6 +881,36 @@ void BitcoinGUI::unlockWallet()
     }
 }
 
+// Enables or disables the internal stake miner;
+// only sets the menu icon and text on the initial run 
+void BitcoinGUI::stakeMinerToggle(bool fInitial) 
+{
+    bool fStakingInt = fStaking;
+
+    if(fInitial) 
+    {
+        fStakingInt = GetBoolArg("-staking", fStaking);
+        fStakingInt = ~fStakingInt & 0x1;
+    }
+
+    if(fStakingInt) 
+    {
+        if(!fInitial) fStaking = false;
+        stakeMinerToggleAction->setIcon(QIcon(":/icons/staking_on"));
+        stakeMinerToggleAction->setText(tr("&Enable PoS mining"));
+    } 
+    else 
+    {
+        if(!fInitial) fStaking = true;
+        stakeMinerToggleAction->setIcon(QIcon(":/icons/staking_off"));
+        stakeMinerToggleAction->setText(tr("&Disable PoS mining"));
+    }
+
+    if(!fInitial)
+        updateStakingIcon();
+}
+
+
 void BitcoinGUI::showNormalIfMinimized(bool fToggleHidden)
 {
     // activateWindow() (sometimes) helps with keyboard focus on Windows
@@ -896,3 +937,34 @@ void BitcoinGUI::toggleHidden()
 {
     showNormalIfMinimized(true);
 }
+
+void BitcoinGUI::updateStakingIcon()
+{
+
+      if (!pwalletMain)
+         return;
+
+      labelStakingIcon->setPixmap(QIcon(":/icons/staking_off").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+
+      if (!fStaking)
+          labelStakingIcon->setToolTip(tr("Not staking because staking is disabled."));
+      else if (!clientModel->getNumConnections())
+          labelStakingIcon->setToolTip(tr("Not staking because wallet is offline"));
+      else if (clientModel->inInitialBlockDownload() || clientModel->getNumBlocks() < clientModel->getNumBlocksOfPeers())
+          labelStakingIcon->setToolTip(tr("Not staking because wallet is syncing"));
+      else if(pwalletMain && pwalletMain->IsLocked())
+          labelStakingIcon->setToolTip(tr("Not staking because wallet is locked"));
+      else if (clientModel->getNumConnections() < 2 )
+          labelStakingIcon->setToolTip(tr("Not staking because wallet is still acquiring nodes"));
+      else
+      {
+          if (!pwalletMain->MintableCoins())
+            labelStakingIcon->setToolTip(tr("Not staking because you don't have mature coins"));
+          else
+          {
+            labelStakingIcon->setPixmap(QIcon(":/icons/staking_on").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
+            labelStakingIcon->setToolTip(tr("Staking."));
+          }
+       }
+}
+

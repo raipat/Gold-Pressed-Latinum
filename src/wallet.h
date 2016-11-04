@@ -81,7 +81,7 @@ private:
 
 public:
     mutable CCriticalSection cs_wallet;
-
+    bool MintableCoins();
     bool fFileBacked;
     std::string strWalletFile;
 
