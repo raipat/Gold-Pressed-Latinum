@@ -42,6 +42,7 @@ inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONE
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 static const unsigned int HARDFORK1_SWITCH_TIME = 1447200000; // Wed, 11 Nov 2015 00:00:00 GMT
+static const unsigned int HARDFORK2_SWITCH_TIME = 1485907200; // Wed, 01 Feb 2017 00:00:00 GMT
 
 #ifdef USE_UPNP
 static const int fHaveUPnP = true;
@@ -53,6 +54,13 @@ static const uint256 hashGenesisBlockOfficial("0x00000164dc3880ea186076b3f546522
 static const uint256 hashGenesisBlockTestNet("0x");
 
 static const int64 nMaxClockDrift = 2 * 60 * 60;        // two hours
+inline int64 GetClockDrift(int64 nTime)
+{
+    if (nTime > HARDFORK2_SWITCH_TIME)
+        return 5 * 60;  // up to 5 minutes Drift
+    else
+        return 2 * 60 * 60;  // up to 120 minutes Drift
+} 
 
 extern CScript COINBASE_FLAGS;
 
@@ -1273,8 +1281,8 @@ public:
         return GetHash();
     }
 
-//    CBigNum GetBlockTrust() const;
-    CBigNum GetBlockTrust() const
+    CBigNum GetBlockTrust() const;
+/*    CBigNum GetBlockTrust() const
     {
         CBigNum bnTarget;
         bnTarget.SetCompact(nBits);
@@ -1282,7 +1290,7 @@ public:
             return 0;
         return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
     }
-    
+  */  
     bool IsInMainChain() const
     {
         return (pnext || this == pindexBest);

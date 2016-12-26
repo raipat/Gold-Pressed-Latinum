@@ -41,6 +41,7 @@ static CBigNum bnInitialHashTarget(~uint256(0) >> 20);
 unsigned int nStakeMinAge = 60 * 60 * 24 * 365; // minimum age for coin age
 unsigned int nStakeMaxAge = 60 * 60 * 24 * 730; // stake age of full weight
 unsigned int nStakeTargetSpacing = .5 * 60; //  30 second minute block spacing
+uint256 nPoWBase = uint256("0x0000ffff00000000000000000000000000000000000000000000000000000000"); // difficulty-1 target
 int64 nChainStartTime = 1377557832;
 int nCoinbaseMaturity = 100;
 CBlockIndex* pindexGenesisBlock = NULL;
@@ -961,7 +962,7 @@ unsigned char GetNfactor(int64 nTimestamp) {
 
     if (nTimestamp <= nChainStartTime)
         return 4;
-        
+    
     if (nTimestamp > HARDFORK1_SWITCH_TIME)
         return 15;
 
@@ -1003,7 +1004,8 @@ int64 GetProofOfStakeReward(int64 nCoinAge)
 }
 
 static const int64 nTargetTimespan = 7 * 24 * 60 * 60;  // one week
-static const int64 nTargetSpacingWorkMax = 12 * nStakeTargetSpacing; // 2-hour
+static const int64 nTargetTimespanV2 =  100 * 60;  // 100 blocks
+static const int64 nTargetSpacingWorkMax = 12 * nStakeTargetSpacing; // 6-min
 
 //
 // minimum amount of work that could possibly be required nTime after
@@ -1035,7 +1037,7 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
     return pindex;
 }
 
-unsigned int static GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
+unsigned int static GetNextTargetRequiredV1(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
     CBigNum bnTargetLimit = bnProofOfWorkLimit;
 
@@ -1075,6 +1077,58 @@ unsigned int static GetNextTargetRequired(const CBlockIndex* pindexLast, bool fP
         bnNew = bnTargetLimit;
 
     return bnNew.GetCompact();
+}
+
+unsigned int static GetNextTargetRequiredV2(const CBlockIndex* pindexLast, bool fProofOfStake)
+{
+    CBigNum bnTargetLimit = bnProofOfWorkLimit;
+
+    if(fProofOfStake)
+    {
+            bnTargetLimit = bnProofOfStakeFork1Limit;
+    }
+
+    if (pindexLast == NULL)
+        return bnTargetLimit.GetCompact(); // genesis block
+
+    const CBlockIndex* pindexPrev = GetLastBlockIndex(pindexLast, fProofOfStake);
+    if (pindexPrev->pprev == NULL)
+        return bnInitialHashTarget.GetCompact(); // first block
+    const CBlockIndex* pindexPrevPrev = GetLastBlockIndex(pindexPrev->pprev, fProofOfStake);
+    if (pindexPrevPrev->pprev == NULL)
+        return bnInitialHashTarget.GetCompact(); // second block
+
+    int64 nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
+    if(nActualSpacing < -180)
+    {
+        nActualSpacing = -180; // retarget +9% maximum
+    }
+    else if(nActualSpacing > nTargetTimespanV2 / 3)
+    {
+        nActualSpacing = nTargetTimespanV2 / 3; //retarget -40% maximum
+    }
+
+    // ppcoin: target change every block
+    // ppcoin: retarget with exponential moving toward target spacing
+    CBigNum bnNew;
+    bnNew.SetCompact(pindexPrev->nBits);
+    int64 nTargetSpacing = fProofOfStake? 2 * nStakeTargetSpacing : min(nTargetSpacingWorkMax * 2, (int64) nStakeTargetSpacing * 2 * (1 + pindexLast->nHeight - pindexPrev->nHeight));
+    int64 nInterval = nTargetTimespanV2 / nTargetSpacing;
+    bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
+    bnNew /= ((nInterval + 1) * nTargetSpacing);
+
+    if (bnNew > bnTargetLimit)
+        bnNew = bnTargetLimit;
+
+    return bnNew.GetCompact();
+}
+
+unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
+{
+  if (pindexLast->GetBlockTime() > HARDFORK2_SWITCH_TIME)
+      return GetNextTargetRequiredV2(pindexLast, fProofOfStake);
+   else
+      return GetNextTargetRequiredV1(pindexLast, fProofOfStake);
 }
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits)
@@ -2012,7 +2066,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot) const
         return DoS(50, error("CheckBlock() : proof of work failed"));
 
     // Check timestamp
-    if (GetBlockTime() > GetAdjustedTime() + nMaxClockDrift)
+    if (GetBlockTime() > GetAdjustedTime() + GetClockDrift(GetBlockTime()))
         return error("CheckBlock() : block timestamp too far in the future");
 
     // First transaction must be coinbase, the rest must not be
@@ -2104,7 +2158,7 @@ bool CBlock::AcceptBlock()
         return DoS(100, error("AcceptBlock() : incorrect %s", IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
 
     // Check timestamp against prev
-    if (GetBlockTime() <= pindexPrev->GetMedianTimePast() || GetBlockTime() + nMaxClockDrift < pindexPrev->GetBlockTime())
+    if (GetBlockTime() <= pindexPrev->GetMedianTimePast() || GetBlockTime() + GetClockDrift(GetBlockTime()) < pindexPrev->GetBlockTime())
         return error("AcceptBlock() : block's timestamp is too early");
 
     // Check that all transactions are finalized
@@ -2155,43 +2209,44 @@ bool CBlock::AcceptBlock()
 
     return true;
 }
-/*
+
 CBigNum CBlockIndex::GetBlockTrust() const
 {
     CBigNum bnTarget;
     bnTarget.SetCompact(nBits);
+
     if (bnTarget <= 0)
         return 0;
 
-    //  new trust rules (since specific block on mainnet and always on testnet)
-    if (nHeight >= 0 || fTestNet) {
-        // first block trust - for future compatibility (i.e., forks :P)
-        if (pprev == NULL)
-            return 1;
+    /* Old protocol */
+    if (GetBlockTime() < HARDFORK2_SWITCH_TIME)
+        return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
 
-        // PoS after PoS? no trust!
-        // (no need to explicitly disallow consecutive PoS
-        // blocks now as they won't get any trust anyway)
-        if (IsProofOfStake() && pprev->IsProofOfStake())
-            return 0;
+    /* New protocol */
 
-        // PoS after PoW? max trust
-        if (IsProofOfStake() && pprev->IsProofOfWork())
-            return 10;
+    // Calculate work amount for block 
+    CBigNum nPoWTrust = CBigNum(nPoWBase) / (bnTarget+1);
+    
+    // Set nPowTrust to 1 if we are checking PoS block or PoW difficulty is too low
+    nPoWTrust = (IsProofOfStake() || nPoWTrust < 1) ? 1 : nPoWTrust;
+    
+    // Return nPoWTrust for the first 12 blocks
+    if (pprev == NULL || pprev->nHeight < 12)
+        return nPoWTrust;
 
-        // PoW trust calculation
-        if (IsProofOfWork())
-            return 1;
+    CBigNum bnLastBlockTrust = CBigNum(pprev->bnChainTrust - pprev->pprev->bnChainTrust);
+    
+    if (IsProofOfStake() && pprev->IsProofOfWork())
+        return bnLastBlockTrust * 3;
+        
+    if (IsProofOfStake() && pprev->IsProofOfStake())
+        return 1;
+    
+    return nPoWTrust;
 
-        // what the hell?!
-        return 0;
-    }
-
-    // old rules
-    return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
 }
  
-*/
+
 bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned int nRequired, unsigned int nToCheck)
 {
     unsigned int nFound = 0;
@@ -2905,9 +2960,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CAddress addrFrom;
         uint64 nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
-        if (pfrom->nVersion < MIN_PROTO_VERSION)
+        if (nTime > HARDFORK2_SWITCH_TIME && pfrom->nVersion < PROTOCOL_START)
         {
-            // Since February 20, 2012, the protocol is initiated at version 209,
+            // Since February 1, 2017, set up new hardfork parameters,
             // and earlier versions are no longer supported
             printf("partner %s using obsolete version %i; disconnecting\n", pfrom->addr.ToString().c_str(), pfrom->nVersion);
             pfrom->fDisconnect = true;
@@ -3982,7 +4037,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         {
             if (pwallet->CreateCoinStake(*pwallet, pblock->nBits, nSearchTime-nLastCoinStakeSearchTime, txCoinStake))
             {
-                if (txCoinStake.nTime >= max(pindexPrev->GetMedianTimePast()+1, pindexPrev->GetBlockTime() - nMaxClockDrift))
+                if (txCoinStake.nTime >= max(pindexPrev->GetMedianTimePast()+1, pindexPrev->GetBlockTime() - GetClockDrift(pindexPrev->GetBlockTime())))
                 {   // make sure coinstake would meet timestamp protocol
                     // as it would be the same as the block timestamp
                     pblock->vtx[0].vout[0].SetEmpty();
@@ -4197,7 +4252,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         if (pblock->IsProofOfStake())
             pblock->nTime      = pblock->vtx[1].nTime; //same as coinstake timestamp
         pblock->nTime          = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
-        pblock->nTime          = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
+        pblock->nTime          = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - GetClockDrift(pindexPrev->GetBlockTime()));
         if (pblock->IsProofOfWork())
             pblock->UpdateTime(pindexPrev);
         pblock->nNonce         = 0;
@@ -4493,11 +4548,11 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
 
             // Update nTime every few seconds
             pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
-            pblock->nTime = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
+            pblock->nTime = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - GetClockDrift(pindexPrev->GetBlockTime()));
             pblock->UpdateTime(pindexPrev);
             nBlockTime = ByteReverse(pblock->nTime);
 
-            if (pblock->GetBlockTime() >= (int64)pblock->vtx[0].nTime + nMaxClockDrift)
+            if (pblock->GetBlockTime() >= (int64)pblock->vtx[0].nTime + GetClockDrift((int64)pblock->vtx[0].nTime))
                 break;  // need to update coinbase timestamp
         }
     }
