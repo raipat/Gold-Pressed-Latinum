@@ -362,17 +362,17 @@ bool GetMyExternalIP(CNetAddr& ipRet)
         //  <?php echo $_SERVER["REMOTE_ADDR"]; ?>
         if (nHost == 1)
         {
-            addrConnect = CService("91.198.22.70",80); // checkip.dyndns.org
+            addrConnect = CService("216.146.38.70",80); // checkip.dyndns.org
 
             if (nLookup == 1)
             {
-                CService addrIP("checkip.dyndns.org", 80, true);
+                CService addrIP("checkip.dyndns.com", 80, true);
                 if (addrIP.IsValid())
                     addrConnect = addrIP;
             }
 
             pszGet = "GET / HTTP/1.1\r\n"
-                     "Host: checkip.dyndns.org\r\n"
+                     "Host: checkip.dyndns.com\r\n"
                      "User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)\r\n"
                      "Connection: close\r\n"
                      "\r\n";
@@ -381,17 +381,17 @@ bool GetMyExternalIP(CNetAddr& ipRet)
         }
         else if (nHost == 2)
         {
-            addrConnect = CService("74.208.43.192", 80); // www.showmyip.com
+            addrConnect = CService("172.217.5.113", 80); // ipv4.appspot.com
 
             if (nLookup == 1)
             {
-                CService addrIP("www.showmyip.com", 80, true);
+                CService addrIP("ipv4.appspot.com", 80, true);
                 if (addrIP.IsValid())
                     addrConnect = addrIP;
             }
 
             pszGet = "GET /simple/ HTTP/1.1\r\n"
-                     "Host: www.showmyip.com\r\n"
+                     "Host: ipv4.appspot.com\r\n"
                      "User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)\r\n"
                      "Connection: close\r\n"
                      "\r\n";
