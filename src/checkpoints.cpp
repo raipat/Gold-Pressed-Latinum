@@ -39,6 +39,7 @@ namespace Checkpoints
         ( 701500, uint256("0x000005a2313fe804c8f4775122bf2e119959da021e7a9991722d7065f2ba8868"))
         ( 717000, uint256("0x0000000f588584124b338aa68091e8aa5464d283b84d9263da47974471d13fc6"))
         ( 738400, uint256("0x00000317e6688ce5c033c981277bc84b92953b3489c37350250b68e94dbb3cc0"))
+        ( 789000, uint256("0x0000040c2c7765691ce635f776922858c99d097ca3e67d0589ce7856fee06b7e"))
         ;
 
     static MapCheckpoints mapCheckpointsTestnet =
@@ -202,14 +203,10 @@ namespace Checkpoints
     // Automatically select a suitable sync-checkpoint 
     uint256 AutoSelectSyncCheckpoint()
     {
-        // Proof-of-work blocks are immediately checkpointed
-        // to defend against 51% attack which rejects other miners block 
-
-        // Select the last proof-of-work block
-        const CBlockIndex *pindex = GetLastBlockIndex(pindexBest, false);
-        // Search forward for a block within max span and maturity window
-        while (pindex->pnext && (pindex->GetBlockTime() + CHECKPOINT_MAX_SPAN <= pindexBest->GetBlockTime() || pindex->nHeight + std::min(6, nCoinbaseMaturity - 20) <= pindexBest->nHeight))
-            pindex = pindex->pnext;
+        const CBlockIndex *pindex = pindexBest;
+        // Search backward for a block within max span and maturity window
+        while (pindex->pprev && (pindex->nHeight + 8 > pindexBest->nHeight))
+            pindex = pindex->pprev;
         return pindex->GetBlockHash();
     }
 
@@ -384,7 +381,7 @@ namespace Checkpoints
 }
 
 // ppcoin: sync-checkpoint master key
-const std::string CSyncCheckpoint::strMasterPubKey = "04483fb518c1f4d6b2d1a4fcfcbd7b5ad7f7fe05d5a585700c5b7e38fa2b2072361f8d6bc705b7b40699b285235cc37d48896c5e1b804cfa19a29bdcb96a1b04d1";
+const std::string CSyncCheckpoint::strMasterPubKey = "049af6452273817d07ec9fd6d4920fedb7e8651fd20e2bb2a6957adf410a0735dddff645ada87b9c4b1aabac38b1094affc427120ed88a8d9ffc6b07b625605804";
 
 std::string CSyncCheckpoint::strMasterPrivKey = "";
 
