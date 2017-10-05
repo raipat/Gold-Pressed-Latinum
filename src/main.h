@@ -43,6 +43,7 @@ inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONE
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 static const unsigned int HARDFORK1_SWITCH_TIME = 1447200000; // Wed, 11 Nov 2015 00:00:00 GMT
 static const unsigned int HARDFORK2_SWITCH_TIME = 1485907200; // Wed, 01 Feb 2017 00:00:00 GMT
+static const unsigned int HARDFORK3_SWITCH_TIME = 1507161600; // Thu, 05 Oct 2017 00:00:00 GMT
 
 #ifdef USE_UPNP
 static const int fHaveUPnP = true;

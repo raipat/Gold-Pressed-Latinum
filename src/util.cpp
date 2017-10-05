@@ -1016,7 +1016,7 @@ boost::filesystem::path GetDefaultDataDir()
     // Unix: ~/.goldpressedlatinum
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "GoldPressedLatinum";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "GoldPressedLatinum2";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -1028,10 +1028,10 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     fs::create_directory(pathRet);
-    return pathRet / "GoldPressedLatinum";
+    return pathRet / "GoldPressedLatinum2";
 #else
     // Unix
-    return pathRet / ".goldpressedlatinum";
+    return pathRet / ".goldpressedlatinum2";
 #endif
 #endif
 }
