@@ -36,13 +36,14 @@ static const int64 MAX_MONEY = 1000000 * COIN;
 static const int64 MAX_MINT_PROOF_OF_WORK = .2 * COIN;
 static const int64 MIN_TXOUT_AMOUNT = MIN_TX_FEE;
 /** Split/Combine Threshold Max */
-static const int64 MAX_SPLIT_AMOUNT = 200 * COIN;
+static const int64 MAX_SPLIT_AMOUNT = 1000 * COIN;
 static const int64 MAX_COMBINE_AMOUNT = 50 * COIN;
 inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 static const unsigned int HARDFORK1_SWITCH_TIME = 1447200000; // Wed, 11 Nov 2015 00:00:00 GMT
 static const unsigned int HARDFORK2_SWITCH_TIME = 1485907200; // Wed, 01 Feb 2017 00:00:00 GMT
+static const unsigned int HARDFORK3_SWITCH_TIME = 1548979200; // Wed, 01 Feb 2019 00:00:00 GMT
 
 #ifdef USE_UPNP
 static const int fHaveUPnP = true;
@@ -75,6 +76,7 @@ extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
 extern uint256 hashGenesisBlock;
 extern CBlockIndex* pindexGenesisBlock;
 extern unsigned int nStakeMinAge;
+extern unsigned int nStakeMinAgeV2;
 extern int nCoinbaseMaturity;
 extern int nBestHeight;
 extern int64 nBestHeightTime;
@@ -128,7 +130,8 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 int64 GetProofOfWorkReward(unsigned int nBits);
-int64 GetProofOfStakeReward(int64 nCoinAge);
+int64 GetProofOfStakeReward(int64 nCoinAge, unsigned int nTime);
+unsigned int GetStakeMinAge(unsigned int nTime);
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);
 int GetNumBlocksOfPeers();
 bool IsInitialBlockDownload();

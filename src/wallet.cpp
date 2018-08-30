@@ -1207,7 +1207,7 @@ bool CWallet::MintableCoins()
 	
 	BOOST_FOREACH(const COutput& out, vCoins)
 	{
-		if(GetTime() - out.tx->GetTxTime() >  nStakeMinAge)
+		if(GetTime() - out.tx->GetTxTime() >  GetStakeMinAge(out.tx->GetTxTime()))
 			return true;
 	}	
 	
@@ -1409,7 +1409,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
                 continue;
         }
         static int nMaxStakeSearchInterval = 60;
-        if (block.GetBlockTime() + nStakeMinAge > txNew.nTime - nMaxStakeSearchInterval)
+        if (block.GetBlockTime() + GetStakeMinAge(block.GetBlockTime()) > txNew.nTime - nMaxStakeSearchInterval)
             continue; // only count coins meeting min age requirement
 
         bool fKernelFound = false;
@@ -1495,7 +1495,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
             if (pcoin.first->vout[pcoin.second].nValue > nCombineThreshold)
                 continue;
             // Do not add input that is still too young
-            if (pcoin.first->nTime + nStakeMinAge > txNew.nTime)
+            if (pcoin.first->nTime + GetStakeMinAge(txNew.nTime) > txNew.nTime)
                 continue;
             txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
             nCredit += pcoin.first->vout[pcoin.second].nValue;
@@ -1508,7 +1508,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         CTxDB txdb("r");
         if (!txNew.GetCoinAge(txdb, nCoinAge))
             return error("CreateCoinStake : failed to calculate coin age");
-        nCredit += GetProofOfStakeReward(nCoinAge);
+        nCredit += GetProofOfStakeReward(nCoinAge, txNew.nTime);
     }
 
     int64 nMinFee = 0;
