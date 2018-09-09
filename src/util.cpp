@@ -1213,7 +1213,7 @@ void AddTimeData(const CNetAddr& ip, int64 nTime)
 
     // Ignore duplicates
     static set<CNetAddr> setKnown;
-    if (!setKnown.insert(ip).second)
+    if ((!setKnown.insert(ip).second) || (abs64(nOffsetSample) > 10 * 60))
         return;
 
     // Add data
