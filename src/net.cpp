@@ -362,7 +362,7 @@ bool GetMyExternalIP(CNetAddr& ipRet)
         //  <?php echo $_SERVER["REMOTE_ADDR"]; ?>
         if (nHost == 1)
         {
-            addrConnect = CService("216.146.38.70",80); // checkip.dyndns.org
+            addrConnect = CService("216.146.38.70",80); // checkip.dyndns.com
 
             if (nLookup == 1)
             {
@@ -485,9 +485,9 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest, int64 nTimeout)
 
 
     /// debug print
-    printf("trying connection %s lastseen=%.1fhrs\n",
-        pszDest ? pszDest : addrConnect.ToString().c_str(),
-        pszDest ? 0 : (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0);
+    //printf("trying connection %s lastseen=%.1fhrs\n",
+    //    pszDest ? pszDest : addrConnect.ToString().c_str(),
+    //    pszDest ? 0 : (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0);
 
     // Connect
     SOCKET hSocket;
@@ -1222,7 +1222,7 @@ void ThreadDNSAddressSeed2(void* parg)
 
 unsigned int pnSeed[] =
 {
-    0x90EF78BC, 0x33F1C851, 0x36F1C851, 0xC6F5C851,
+    0x38484740, 0xA4F9142F, 0x065ECB49, 0x2B1EFE6D, 0x2424424E, 0x291979B9, 0xAAF2175F, 0x0F0D7A4F,
 };
 
 void DumpAddresses()
